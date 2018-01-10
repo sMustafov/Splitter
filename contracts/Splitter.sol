@@ -9,57 +9,44 @@ pragma solidity ^0.4.16;
 // cover potentially bad input data
 
 contract Splitter {
-
     address public owner;
 
     mapping(address => uint256) public balances;
 
-	event SplitterCreated(address indexed _from, address indexed _to, uint256 _amount, uint256 _deadline);
-    event SendToContract(address indexed _sender, address indexed _contract, uint256 amount);
-    event Split(address indexed _sender, address indexed _receiver, uint256 _amount);
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
+    }
+
+	event Split(address indexed _from, address indexed _firstReceiver, address indexed _secondReceiver, uint256 _amount);
     event Killed(address indexed _owner);
 
-    function Splitter() public {
+    function Splitter(address firstReceiver, address secondReceiver) payable public {
+        require(msg.value > 0);
+        require(firstReceiver != address(0));
+        require(secondReceiver != address(0));
+
         owner = msg.sender;
-    }
-
-    function sendToContract() payable public returns (bool) {
-        require(msg.value > 0);
         balances[this] += msg.value;
-
-        SendToContract(msg.sender, this, msg.value);
-        return true;
-    }
-
-    function split(address[] receivers) payable public returns (bool) {
-        require(msg.value > 0);
-
-        uint256 receiversCount = receivers.length;
 
         // No decimals
         // Problem if it is odd number
-        uint256 remainder = msg.value % receivers.length;
+        uint256 remainder = msg.value % 2;
         if (remainder > 0) {
-            balances[msg.sender] += remainder;
+            balances[this] += remainder;
         }
-
-        for (var index = 0; index < receiversCount; index++) {
-            address receiverAddress = receivers[index];
-            require(receiverAddress != address(0));
              
-            balances[receiverAddress] += msg.value/receiversCount;
-            Split(msg.sender, receiverAddress, msg.value);
-        }
-        
-        return true;
+        balances[firstReceiver] += msg.value/2;
+        balances[secondReceiver] += msg.value/2;
+
+        Split(msg.sender, firstReceiver, secondReceiver, msg.value);
     }
 
     function() payable public {
 		revert();
 	}
 
-	function kill() public {
-        require(msg.sender == owner);
+	function kill() public onlyOwner {
       	Killed(owner);
       	selfdestruct(owner);
     }
